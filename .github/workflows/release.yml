@@ -57,7 +57,7 @@ jobs:
           EXT=""
           if [ "$GOOS" = "windows" ]; then EXT=".exe"; fi
 
-          CDN_OUT="zcode-offline-cdn_${GOOS}_${GOARCH}${EXT}"
+          CDN_OUT="zcode-remote-server-downloader_${GOOS}_${GOARCH}${EXT}"
           DL_OUT="download-offline-assets_${GOOS}_${GOARCH}${EXT}"
 
           (cd offline && go build -trimpath -ldflags="-s -w" -o "../dist/${CDN_OUT}" .)
@@ -72,15 +72,15 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: |
           set -euo pipefail
-          BUNDLE="dist/zcode-offline-cdn-docker-linux-${GOARCH}"
+          BUNDLE="dist/zcode-remote-server-downloader-docker-linux-${GOARCH}"
           mkdir -p "${BUNDLE}"
-          cp "dist/zcode-offline-cdn_linux_${GOARCH}" "${BUNDLE}/zcode-offline-cdn"
+          cp "dist/zcode-remote-server-downloader_linux_${GOARCH}" "${BUNDLE}/zcode-remote-server-downloader"
           cp offline/Dockerfile.prebuilt "${BUNDLE}/Dockerfile.prebuilt"
           cp offline/docker-up-prebuilt.sh "${BUNDLE}/docker-up.sh"
           cp offline/docker-bundle-README.txt "${BUNDLE}/README.txt"
           sed "s/__GOARCH__/${GOARCH}/g" offline/docker-compose.bundle.yml > "${BUNDLE}/docker-compose.yml"
-          chmod +x "${BUNDLE}/zcode-offline-cdn" "${BUNDLE}/docker-up.sh"
-          tar -C dist -czf "dist/zcode-offline-cdn-docker-linux-${GOARCH}.tar.gz" "zcode-offline-cdn-docker-linux-${GOARCH}"
+          chmod +x "${BUNDLE}/zcode-remote-server-downloader" "${BUNDLE}/docker-up.sh"
+          tar -C dist -czf "dist/zcode-remote-server-downloader-docker-linux-${GOARCH}.tar.gz" "zcode-remote-server-downloader-docker-linux-${GOARCH}"
           rm -rf "${BUNDLE}"
 
       - name: Upload artifacts
@@ -111,7 +111,7 @@ jobs:
           set -euo pipefail
           mkdir -p release
           # artifacts may be nested by artifact name or flat when merge-multiple
-          find artifacts -type f \( -name 'zcode-offline-cdn_*' -o -name 'download-offline-assets_*' -o -name 'zcode-offline-cdn-docker-linux-*.tar.gz' \) -exec cp -t release {} +
+          find artifacts -type f \( -name 'zcode-remote-server-downloader_*' -o -name 'download-offline-assets_*' -o -name 'zcode-remote-server-downloader-docker-linux-*.tar.gz' \) -exec cp -t release {} +
           cd release
           sha256sum * > SHA256SUMS.txt
           ls -lah

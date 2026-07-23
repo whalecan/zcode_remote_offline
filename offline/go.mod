@@ -1,3 +1,3 @@
-module zcode-offline-cdn
+module zcode-remote-server-downloader
 
 go 1.22

@@ -1,11 +1,11 @@
 services:
-  zcode-offline-cdn:
+  zcode-remote-server-downloader:
     build:
       context: .
       dockerfile: Dockerfile.prebuilt
-    image: zcode-offline-cdn:local
+    image: zcode-remote-server-downloader:local
     platform: linux/__GOARCH__
-    container_name: zcode-offline-cdn
+    container_name: zcode-remote-server-downloader
     ports:
       - "${PORT:-8765}:80"
     volumes:

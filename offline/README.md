@@ -18,7 +18,7 @@
 3. 解压到本机 `%APPDATA%\ZCode\remote-assets-cache`
 4. 经 SFTP 上传到远程 `~/.zcode/server` 并启动
 
-离线做法：把 CDN 目录镜像到本机，用本地 HTTP 服务冒充 CDN，再通过环境变量把客户端指过去。
+离线做法：把 CDN 目录镜像到本机，用本地 HTTP 服务MOCK CDN，再通过环境变量把客户端指过去。
 
 ```
 本机 ZCode ──HTTP──► 本地 CDN（本目录 Go 服务，可选 Docker 包装）
@@ -65,8 +65,8 @@ offline/
 ```bash
 go run .
 # 或
-go build -trimpath -ldflags="-s -w" -o zcode-offline-cdn .
-./zcode-offline-cdn
+go build -trimpath -ldflags="-s -w" -o zcode-remote-server-downloader .
+./zcode-remote-server-downloader
 ```
 
 Windows：
@@ -127,7 +127,7 @@ docker compose -f docker-compose.yml -f docker-compose.arm64.yml up -d --build
 | `docker-compose.prebuilt.yml` | 预编译二进制启动 |
 | `docker-up.sh` / `docker-up-prebuilt.sh` | 一键启停 |
 
-从 GitHub Release 也可直接下载 `zcode-offline-cdn-docker-linux-amd64.tar.gz` / `…-arm64.tar.gz`（内含二进制 + Dockerfile + compose + 启动脚本）。
+从 GitHub Release 也可直接下载 `zcode-remote-server-downloader-docker-linux-amd64.tar.gz` / `…-arm64.tar.gz`（内含二进制 + Dockerfile + compose + 启动脚本）。
 
 ---
 
@@ -274,7 +274,7 @@ PORT=9876 ./docker-up.sh
 
 - `未找到 docker`：可直接用 `go run .`，不必装 Docker。
 - 强制重建镜像：`docker compose build --no-cache && docker compose up -d`
-- 查看日志：`docker logs -f zcode-offline-cdn`---
+- 查看日志：`docker logs -f zcode-remote-server-downloader`---
 
 ## 版本记录（当前已收录示例）
 

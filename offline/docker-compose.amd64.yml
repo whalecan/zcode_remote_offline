@@ -3,5 +3,5 @@
 #   或：./docker-up.sh --amd64
 
 services:
-  zcode-offline-cdn:
+  zcode-remote-server-downloader:
     platform: linux/amd64

@@ -16,7 +16,7 @@ docker-compose.prebuilt.yml
 docker-compose.bundle.yml
 Dockerfile.prebuilt
 docker-bundle-README.txt
-zcode-offline-cdn
-zcode-offline-cdn.exe
-zcode-offline-cdn_*
+zcode-remote-server-downloader
+zcode-remote-server-downloader.exe
+zcode-remote-server-downloader_*
 download-offline-assets*
