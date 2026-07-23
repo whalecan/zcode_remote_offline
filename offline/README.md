@@ -120,7 +120,7 @@ docker compose -f docker-compose.yml -f docker-compose.arm64.yml up -d --build
 | `docker-compose.amd64.yml` / `docker-compose.arm64.yml` | 显式架构 |
 | `docker-up.sh` | 一键启停 |
 
-克隆本仓库后，在本目录用 Docker 多阶段构建（构建时编译，无需下载 Release 二进制）：
+克隆本仓库后可自行构建；也可直接使用 Release 中的 `zcode-cdn-mock_docker_image_linux_*.tar.gz`（见根目录 README 方式 B）：
 
 ```bash
 docker build --platform linux/amd64 -t zcode-cdn-mock:local .

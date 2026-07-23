@@ -66,6 +66,28 @@ jobs:
           echo "Built:"
           ls -lh dist/
 
+      - name: Set up QEMU
+        if: matrix.goos == 'linux'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        if: matrix.goos == 'linux'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and pack Docker image
+        if: matrix.goos == 'linux'
+        env:
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          set -euo pipefail
+          docker buildx build --load --platform "linux/${GOARCH}" \
+            -t zcode-cdn-mock:local \
+            -f offline/Dockerfile \
+            offline/
+          OUT="dist/zcode-cdn-mock_docker_image_linux_${GOARCH}.tar.gz"
+          docker save zcode-cdn-mock:local | gzip > "${OUT}"
+          ls -lh "${OUT}"
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -94,7 +116,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release
-          find artifacts -type f \( -name 'zcode-cdn-mock_*' -o -name 'download-offline-assets_*' \) -exec cp -t release {} +
+          find artifacts -type f \( \
+            -name 'zcode-cdn-mock_*' -o \
+            -name 'download-offline-assets_*' \
+          \) -exec cp -t release {} +
           cd release
           sha256sum * > SHA256SUMS.txt
           ls -lah
@@ -123,8 +148,9 @@ jobs:
           generate_release_notes: true
           body: |
             ## 产物说明
-            本 Release **仅包含二进制**（`zcode-cdn-mock_*` / `download-offline-assets_*`）。
-            Docker 相关文件请自行克隆仓库后在 `offline/` 目录构建，详见 README。
+            - **二进制**：`zcode-cdn-mock_*` / `download-offline-assets_*`
+            - **Docker 镜像包**（约 2MB）：`zcode-cdn-mock_docker_image_linux_{amd64,arm64}.tar.gz`
+              离线机：`docker load -i …` 后 `docker run`，详见 README。
           files: |
             release/*
           fail_on_unmatched_files: true

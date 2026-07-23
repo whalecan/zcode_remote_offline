@@ -1,22 +1,17 @@
 # 多架构构建（linux/amd64、linux/arm64）
 # 需要 BuildKit：
-#   docker buildx build --platform linux/amd64 -t zcode-cdn-mock:amd64 .
-#   docker buildx build --platform linux/arm64 -t zcode-cdn-mock:arm64 .
+#   docker buildx build --platform linux/amd64 -t zcode-cdn-mock:local .
+#   docker buildx build --platform linux/arm64 -t zcode-cdn-mock:local .
 # 或由 docker-up.sh / compose 自动选择当前架构。
-#
-# 国内默认：docker.linkos.org + goproxy.cn
-# 海外覆盖：docker build --build-arg DOCKER_REGISTRY=docker.io ...
 #
 # 不依赖 Docker 时可直接：go run .
 
-ARG DOCKER_REGISTRY=docker.linkos.org
 ARG TARGETOS=linux
 ARG TARGETARCH
 
-FROM --platform=$BUILDPLATFORM ${DOCKER_REGISTRY}/library/golang:1.22-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.22-alpine AS build
 ARG TARGETOS
 ARG TARGETARCH
-ENV GOPROXY=https://goproxy.cn,direct
 WORKDIR /src
 COPY go.mod ./
 COPY main.go ./
