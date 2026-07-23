@@ -1,0 +1,25 @@
+# 预编译二进制镜像（配合 Dockerfile.prebuilt / Release docker 包）
+#
+# 数据目录默认挂载 ./data（将 offline 资源放到 data/ 下）：
+#   mkdir -p data && cp -a zcode data/
+#
+#   DOCKER_PLATFORM=linux/amd64 docker compose -f docker-compose.prebuilt.yml up -d --build
+#   DOCKER_PLATFORM=linux/arm64 docker compose -f docker-compose.prebuilt.yml up -d --build
+
+services:
+  zcode-offline-cdn:
+    build:
+      context: .
+      dockerfile: Dockerfile.prebuilt
+    image: zcode-offline-cdn:local
+    platform: ${DOCKER_PLATFORM:-linux/amd64}
+    container_name: zcode-offline-cdn
+    ports:
+      - "${PORT:-8765}:80"
+    volumes:
+      - ${DATA_DIR:-./data}:/data:ro
+    environment:
+      CDN_ROOT: /data
+      PORT: "80"
+      BIND: "0.0.0.0"
+    restart: unless-stopped

@@ -1,0 +1,17 @@
+# 本地构建产物
+dist/
+*.exe
+zcode-offline-cdn
+zcode-offline-cdn_*
+download-offline-assets
+download-offline-assets_*
+
+# 可下载的离线资源（由 online 工具拉取，勿提交）
+offline/zcode/
+offline/sha256sums-*.txt
+**/*.tar.gz
+**/*.partial
+
+# 编辑器 / 本地杂项
+.specstory/
+.cursorindexingignore

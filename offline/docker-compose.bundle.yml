@@ -1,0 +1,17 @@
+services:
+  zcode-offline-cdn:
+    build:
+      context: .
+      dockerfile: Dockerfile.prebuilt
+    image: zcode-offline-cdn:local
+    platform: linux/__GOARCH__
+    container_name: zcode-offline-cdn
+    ports:
+      - "${PORT:-8765}:80"
+    volumes:
+      - ${DATA_DIR:-./data}:/data:ro
+    environment:
+      CDN_ROOT: /data
+      PORT: "80"
+      BIND: "0.0.0.0"
+    restart: unless-stopped

@@ -1,0 +1,7 @@
+# 显式 linux/amd64
+#   docker compose -f docker-compose.yml -f docker-compose.amd64.yml up -d --build
+#   或：./docker-up.sh --amd64
+
+services:
+  zcode-offline-cdn:
+    platform: linux/amd64

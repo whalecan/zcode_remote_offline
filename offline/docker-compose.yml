@@ -1,0 +1,28 @@
+# 源码构建镜像（多架构）
+#
+#   ./docker-up.sh                  # 自动检测 amd64 / arm64
+#   ./docker-up.sh --amd64
+#   ./docker-up.sh --arm64
+#   DOCKER_PLATFORM=linux/arm64 docker compose up -d --build
+#
+# 环境变量：
+#   PORT=8765
+#   DOCKER_PLATFORM=linux/amd64|linux/arm64
+
+services:
+  zcode-offline-cdn:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: zcode-offline-cdn:local
+    platform: ${DOCKER_PLATFORM:-linux/amd64}
+    container_name: zcode-offline-cdn
+    ports:
+      - "${PORT:-8765}:80"
+    volumes:
+      - ./:/data:ro
+    environment:
+      CDN_ROOT: /data
+      PORT: "80"
+      BIND: "0.0.0.0"
+    restart: unless-stopped

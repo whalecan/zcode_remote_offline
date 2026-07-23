@@ -1,0 +1,145 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag（如 v1.0.0；留空则用 run 号生成）"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+env:
+  GO_VERSION: "1.22.x"
+
+jobs:
+  build:
+    name: build (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+          - goos: windows
+            goarch: arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: |
+            offline/go.mod
+            online/go.mod
+
+      - name: Build binaries
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          EXT=""
+          if [ "$GOOS" = "windows" ]; then EXT=".exe"; fi
+
+          CDN_OUT="zcode-offline-cdn_${GOOS}_${GOARCH}${EXT}"
+          DL_OUT="download-offline-assets_${GOOS}_${GOARCH}${EXT}"
+
+          (cd offline && go build -trimpath -ldflags="-s -w" -o "../dist/${CDN_OUT}" .)
+          (cd online && go build -trimpath -ldflags="-s -w" -o "../dist/${DL_OUT}" .)
+
+          echo "Built:"
+          ls -lh dist/
+
+      - name: Pack Linux Docker bundle
+        if: matrix.goos == 'linux'
+        env:
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          set -euo pipefail
+          BUNDLE="dist/zcode-offline-cdn-docker-linux-${GOARCH}"
+          mkdir -p "${BUNDLE}"
+          cp "dist/zcode-offline-cdn_linux_${GOARCH}" "${BUNDLE}/zcode-offline-cdn"
+          cp offline/Dockerfile.prebuilt "${BUNDLE}/Dockerfile.prebuilt"
+          cp offline/docker-up-prebuilt.sh "${BUNDLE}/docker-up.sh"
+          cp offline/docker-bundle-README.txt "${BUNDLE}/README.txt"
+          sed "s/__GOARCH__/${GOARCH}/g" offline/docker-compose.bundle.yml > "${BUNDLE}/docker-compose.yml"
+          chmod +x "${BUNDLE}/zcode-offline-cdn" "${BUNDLE}/docker-up.sh"
+          tar -C dist -czf "dist/zcode-offline-cdn-docker-linux-${GOARCH}.tar.gz" "zcode-offline-cdn-docker-linux-${GOARCH}"
+          rm -rf "${BUNDLE}"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            dist/*
+          if-no-files-found: error
+
+  release:
+    name: publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Prepare release assets
+        id: prep
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          # artifacts may be nested by artifact name or flat when merge-multiple
+          find artifacts -type f \( -name 'zcode-offline-cdn_*' -o -name 'download-offline-assets_*' -o -name 'zcode-offline-cdn-docker-linux-*.tar.gz' \) -exec cp -t release {} +
+          cd release
+          sha256sum * > SHA256SUMS.txt
+          ls -lah
+          echo "count=$(ls -1 | wc -l)" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve tag
+        id: tag
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+            if [ -z "$TAG" ]; then
+              TAG="v0.0.${{ github.run_number }}"
+            fi
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Using tag: ${TAG}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: ${{ steps.tag.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            release/*
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

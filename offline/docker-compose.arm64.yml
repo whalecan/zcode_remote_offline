@@ -1,0 +1,7 @@
+# 显式 linux/arm64
+#   docker compose -f docker-compose.yml -f docker-compose.arm64.yml up -d --build
+#   或：./docker-up.sh --arm64
+
+services:
+  zcode-offline-cdn:
+    platform: linux/arm64
