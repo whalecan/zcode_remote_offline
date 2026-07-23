@@ -10,13 +10,13 @@
 #   DOCKER_PLATFORM=linux/amd64|linux/arm64
 
 services:
-  zcode-remote-server-downloader:
+  zcode-cdn-mock:
     build:
       context: .
       dockerfile: Dockerfile
-    image: zcode-remote-server-downloader:local
+    image: zcode-cdn-mock:local
     platform: ${DOCKER_PLATFORM:-linux/amd64}
-    container_name: zcode-remote-server-downloader
+    container_name: zcode-cdn-mock
     ports:
       - "${PORT:-8765}:80"
     volumes:

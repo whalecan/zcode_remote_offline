@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # 使用 Release 预编译二进制 + Dockerfile.prebuilt 启动（适合离线机无 Go）
 #
-# 用法（在含 zcode-remote-server-downloader 二进制的目录）：
+# 用法（在含 zcode-cdn-mock 二进制的目录）：
 #   ./docker-up-prebuilt.sh
 #   ./docker-up-prebuilt.sh --amd64
 #   ./docker-up-prebuilt.sh --arm64
@@ -58,8 +58,8 @@ if [ "$DOWN" -eq 1 ]; then
   exit 0
 fi
 
-if [ ! -f ./zcode-remote-server-downloader ]; then
-  echo "缺少 ./zcode-remote-server-downloader 二进制。请从 GitHub Release 下载对应架构文件并改名为 zcode-remote-server-downloader。" >&2
+if [ ! -f ./zcode-cdn-mock ]; then
+  echo "缺少 ./zcode-cdn-mock 二进制。请从 GitHub Release 下载对应架构文件并改名为 zcode-cdn-mock。" >&2
   exit 1
 fi
 

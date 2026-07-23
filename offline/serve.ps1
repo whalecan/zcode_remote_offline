@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 param(
   [int]$Port = 8765,
   [string]$BindHost = '127.0.0.1'
@@ -52,7 +52,7 @@ foreach ($v in $versions) {
   }
 }
 Write-Host ''
-Write-Host '提示：推荐用 Go 独立服务：go run .'
+Write-Host '提示：推荐从 Release 下载 zcode-cdn-mock 二进制，或使用 ./docker-up.sh'
 Write-Host '按 Ctrl+C 停止服务。'
 Write-Host ''
 

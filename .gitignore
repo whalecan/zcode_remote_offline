@@ -1,8 +1,8 @@
 # 本地构建产物
 dist/
 *.exe
-zcode-remote-server-downloader
-zcode-remote-server-downloader_*
+zcode-cdn-mock
+zcode-cdn-mock_*
 download-offline-assets
 download-offline-assets_*
 

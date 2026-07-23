@@ -5,7 +5,7 @@ ZCode Offline CDN — Linux Docker 包（预编译二进制）
      cp -a /path/to/offline/zcode data/
 
 2. 启动：
-     chmod +x docker-up.sh zcode-remote-server-downloader
+     chmod +x docker-up.sh zcode-cdn-mock
      ./docker-up.sh
 
 3. 客户端设置：

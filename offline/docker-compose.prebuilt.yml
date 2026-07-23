@@ -7,13 +7,13 @@
 #   DOCKER_PLATFORM=linux/arm64 docker compose -f docker-compose.prebuilt.yml up -d --build
 
 services:
-  zcode-remote-server-downloader:
+  zcode-cdn-mock:
     build:
       context: .
       dockerfile: Dockerfile.prebuilt
-    image: zcode-remote-server-downloader:local
+    image: zcode-cdn-mock:local
     platform: ${DOCKER_PLATFORM:-linux/amd64}
-    container_name: zcode-remote-server-downloader
+    container_name: zcode-cdn-mock
     ports:
       - "${PORT:-8765}:80"
     volumes:

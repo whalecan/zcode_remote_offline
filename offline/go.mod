@@ -1,3 +1,3 @@
-module zcode-remote-server-downloader
+module zcode-cdn-mock
 
 go 1.22

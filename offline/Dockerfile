@@ -1,7 +1,7 @@
 # 多架构构建（linux/amd64、linux/arm64）
 # 需要 BuildKit：
-#   docker buildx build --platform linux/amd64 -t zcode-remote-server-downloader:amd64 .
-#   docker buildx build --platform linux/arm64 -t zcode-remote-server-downloader:arm64 .
+#   docker buildx build --platform linux/amd64 -t zcode-cdn-mock:amd64 .
+#   docker buildx build --platform linux/arm64 -t zcode-cdn-mock:arm64 .
 # 或由 docker-up.sh / compose 自动选择当前架构。
 #
 # 不依赖 Docker 时可直接：go run .

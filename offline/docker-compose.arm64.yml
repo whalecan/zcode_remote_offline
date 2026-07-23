@@ -3,5 +3,5 @@
 #   或：./docker-up.sh --arm64
 
 services:
-  zcode-remote-server-downloader:
+  zcode-cdn-mock:
     platform: linux/arm64

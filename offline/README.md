@@ -58,27 +58,23 @@ offline/
 
 ---
 
-## 启动本地 CDN（推荐：Go 独立程序）
+## 启动本地 CDN（推荐：Release 二进制）
 
-需要 Go 1.22+。在本目录执行：
+从 [GitHub Releases](https://github.com/coloraven/zcode_remote_offline/releases) 下载对应平台的 `zcode-cdn-mock_<os>_<arch>[.exe]`，放到本目录执行：
 
 ```bash
-go run .
-# 或
-go build -trimpath -ldflags="-s -w" -o zcode-remote-server-downloader .
-./zcode-remote-server-downloader
+chmod +x zcode-cdn-mock_linux_amd64
+./zcode-cdn-mock_linux_amd64
 ```
 
-Windows：
-
 ```powershell
-go run .
+.\zcode-cdn-mock_windows_amd64.exe
 ```
 
 默认：`http://127.0.0.1:8765`（可用环境变量 `PORT` / `BIND` / `CDN_ROOT` 覆盖）。
 
 ```bash
-PORT=9000 BIND=0.0.0.0 go run .
+PORT=9000 BIND=0.0.0.0 ./zcode-cdn-mock_linux_amd64
 ```
 
 ### 自检
@@ -98,9 +94,9 @@ PORT=9000 BIND=0.0.0.0 go run .
 
 ---
 
-## 可选：Docker 包装（Linux amd64 / arm64）
+## 可选：Docker 拉起（Linux amd64 / arm64）
 
-Docker **不是必需**。同一套文件支持两种架构：
+与直接跑二进制二选一。同一套文件支持两种架构：
 
 ```bash
 chmod +x docker-up.sh
@@ -127,7 +123,7 @@ docker compose -f docker-compose.yml -f docker-compose.arm64.yml up -d --build
 | `docker-compose.prebuilt.yml` | 预编译二进制启动 |
 | `docker-up.sh` / `docker-up-prebuilt.sh` | 一键启停 |
 
-从 GitHub Release 也可直接下载 `zcode-remote-server-downloader-docker-linux-amd64.tar.gz` / `…-arm64.tar.gz`（内含二进制 + Dockerfile + compose + 启动脚本）。
+从 GitHub Release 也可直接下载 `zcode-cdn-mock-docker-linux-amd64.tar.gz` / `…-arm64.tar.gz`（内含二进制 + Dockerfile + compose + 启动脚本）。
 
 ---
 
@@ -224,7 +220,7 @@ Get-FileHash -Algorithm SHA256 .\zcode\electron\releases\components\linux-x64\*\
 
 将整个 `offline` 目录拷到离线电脑后：
 
-1. 执行 `go run .`（或可选的 `./docker-up.sh` / `.\serve.ps1`）
+1. 执行 Release 二进制 `zcode-cdn-mock_*`（或 Docker / `.\serve.ps1`）
 2. 设置同样的 `ZCODE_REMOTE_ASSET_CDN_BASE_URL`
 3. 重启 ZCode 再连远程
 
@@ -245,7 +241,7 @@ Get-FileHash -Algorithm SHA256 .\zcode\electron\releases\components\linux-x64\*\
 ### 仍在访问公网 CDN
 
 - 确认环境变量对「启动 ZCode 的进程」可见（设完后需重启客户端）
-- 确认 CDN 服务（`go run .` / Docker / `serve.ps1`）仍在运行
+- 确认 CDN 服务（二进制 / Docker / `serve.ps1`）仍在运行
 - 确认 URL 能打开 manifest（见上文自检链接）
 
 ### 远程不是 linux-x64
@@ -259,22 +255,35 @@ manifest 的 `appVersion` 必须与客户端一致。用 [`../online`](../online
 ### 端口被占用
 
 ```bash
-PORT=9876 go run .
+PORT=9876 ./zcode-cdn-mock_linux_amd64
 # 或
 PORT=9876 ./docker-up.sh
 ```
 
 ```powershell
+.\zcode-cdn-mock_windows_amd64.exe
+# 设置环境变量 PORT=9876 后启动；或
 .\serve.ps1 -Port 9876
 ```
 
 同时把环境变量改成新端口。
 
-### Docker 相关（可选）
+### Docker 相关
 
-- `未找到 docker`：可直接用 `go run .`，不必装 Docker。
+- `未找到 docker`：改用 Release 二进制直接运行即可。
 - 强制重建镜像：`docker compose build --no-cache && docker compose up -d`
-- 查看日志：`docker logs -f zcode-remote-server-downloader`---
+- 查看日志：`docker logs -f zcode-cdn-mock`
+
+### 开发（可选）
+
+改本仓库源码时可用：
+
+```bash
+go run .
+go build -trimpath -ldflags="-s -w" -o zcode-cdn-mock .
+```
+
+日常使用请下载 Release 二进制，不必安装 Go。
 
 ## 版本记录（当前已收录示例）
 

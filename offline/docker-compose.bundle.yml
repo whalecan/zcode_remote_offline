@@ -1,11 +1,11 @@
 services:
-  zcode-remote-server-downloader:
+  zcode-cdn-mock:
     build:
       context: .
       dockerfile: Dockerfile.prebuilt
-    image: zcode-remote-server-downloader:local
+    image: zcode-cdn-mock:local
     platform: linux/__GOARCH__
-    container_name: zcode-remote-server-downloader
+    container_name: zcode-cdn-mock
     ports:
       - "${PORT:-8765}:80"
     volumes:

@@ -28,44 +28,49 @@ resources/
 
 ## 前置条件
 
-- Go 1.22+
 - 能访问以下任一 CDN：
   - `https://cdn-zcode.z.ai/zcode/electron/releases`
   - `https://cdn.codegeex.cn/zcode/electron/releases`
   - `https://cdn.zcode-ai.com/zcode/electron/releases`
+- 从 [GitHub Releases](https://github.com/coloraven/zcode_remote_offline/releases) 下载 `download-offline-assets_<os>_<arch>[.exe]`（日常使用无需 Go）
 
 ---
 
-## 用法
+## 用法（推荐：Release 二进制）
+
+将二进制放在 `online/` 目录下执行（写入同级 `../offline`）：
 
 ```powershell
-cd <本仓库>/online
+# 列出 CDN 上可用版本（并标注本地是否已有）
+.\download-offline-assets_windows_amd64.exe -list
 
-# 拉取指定版本（写入 ../offline）
-go run . -version 3.4.2
-
-# 客户端升级后，改成新版本号
-go run . -version 3.5.0
-
-# 强制重新下载
-go run . -version 3.4.2 -force
-
-# 指定 CDN
-go run . -version 3.4.2 -cdn https://cdn-zcode.z.ai/zcode/electron/releases
-
-go run . -help
+.\download-offline-assets_windows_amd64.exe -version 3.4.2
+.\download-offline-assets_windows_amd64.exe -version 3.5.0 -force
+.\download-offline-assets_windows_amd64.exe -version 3.4.2 -cdn https://cdn-zcode.z.ai/zcode/electron/releases
+.\download-offline-assets_windows_amd64.exe -help
 ```
 
-也可先编译再执行：
+```bash
+chmod +x download-offline-assets_linux_amd64
+./download-offline-assets_linux_amd64 -list
+./download-offline-assets_linux_amd64 -version 3.4.2
+```
+
+不传 `-version` 时，会尝试使用 `offline` 里已有的最高版本。
+
+> `-list` 会读取 update feed / changelog 收集候选，再探测各版本是否存在 `manifest-linux-x64.json`（CDN 本身无目录索引）。
+
+---
+
+## 开发（可选）
+
+改源码时需要 Go 1.22+：
 
 ```powershell
+go run . -version 3.4.2
 go build -trimpath -ldflags="-s -w" -o download-offline-assets.exe .
 .\download-offline-assets.exe -version 3.4.2
 ```
-
-或不装 Go：从 GitHub Release 下载对应平台的 `download-offline-assets_<os>_<arch>[.exe]`（由 `.github/workflows/release.yml` 自动构建）。
-
-不传 `-version` 时，会尝试使用 `offline` 里已有的最高版本。
 
 ---
 
@@ -89,7 +94,7 @@ go build -trimpath -ldflags="-s -w" -o download-offline-assets.exe .
 
 1. 在本机（有网）跑完下载工具
 2. 将整个 `offline/` 目录拷贝到离线电脑
-3. 在离线机按 [`../offline/README.md`](../offline/README.md) 用 `go run .` 启动本地 CDN（Docker / `serve.ps1` 可选），并配置环境变量
+3. 在离线机按 [`../offline/README.md`](../offline/README.md) 用 Release 二进制或 Docker 启动本地 CDN，并配置环境变量
 
 多版本可反复执行并指定不同 `-version`；离线服务会按请求路径自动响应，无需改配置。
 
