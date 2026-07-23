@@ -17,7 +17,7 @@ ZCode 连接 SSH 远程（linux-x64）时，需要在线从 CDN 拉取 `manifest
 | [`online/`](online/) | 有网环境：从公网 CDN 拉取 / 更新资源到 `offline/` |
 | [`offline/`](offline/) | 离线环境：本地 HTTP 服务 MOCK 线上 CDN（多版本自动响应） |
 
-正常使用请从 [GitHub Releases](https://github.com/coloraven/zcode_remote_offline/releases) 下载对应平台二进制（或 Linux Docker 包），无需安装 Go。
+正常使用请从 [GitHub Releases](https://github.com/coloraven/zcode_remote_offline/releases) 下载对应平台二进制，无需安装 Go。Docker 需自行克隆仓库后构建。
 
 ---
 ## 使用方法
@@ -47,7 +47,7 @@ chmod +x download-offline-assets_linux_amd64
 
 先准备好已拉取的 `offline/` 资源目录，再任选其一：
 
-#### 方式 A：直接跑二进制（推荐）
+#### 方式 A：直接跑二进制
 
 从 Release 下载 `zcode-cdn-mock_<os>_<arch>[.exe]`，放到 `offline/` 目录下执行：
 
@@ -71,7 +71,7 @@ CDN 根：`http://127.0.0.1:8765/zcode/electron/releases`
 PORT=9000 BIND=0.0.0.0 ./zcode-cdn-mock_linux_amd64
 ```
 
-#### 方式 B：Docker（Linux amd64 / arm64）— 仅离线 CDN 服务
+#### 方式 B：Docker（Linux amd64 / arm64）— 仅离线 CDN 服务（推荐）
 
 Docker **只用于**离线侧的本地 CDN HTTP 服务（把已镜像的 `offline/zcode` 资源对外提供下载）。  
 有网侧的 `download-offline-assets_*`（从公网 CDN 拉资源）**不需要**构建镜像，直接跑二进制即可。
@@ -80,14 +80,33 @@ Docker **只用于**离线侧的本地 CDN HTTP 服务（把已镜像的 `offlin
 
 ##### B1. 有网机构建「离线 CDN 服务」镜像并打包
 
-从 Release 下载 `zcode-cdn-mock_*` 与 `offline/Dockerfile.prebuilt`（或解压 `zcode-cdn-mock-docker-linux-*.tar.gz`）：
+Release **只发布二进制**；Docker 需克隆仓库，由 `Dockerfile` 多阶段构建（构建阶段编译 Go，最终镜像为 `scratch`）：
 
 ```bash
-# 以 amd64 为例；arm64 将文件名中的 amd64 换成 arm64
-cp zcode-cdn-mock_linux_amd64 zcode-cdn-mock
-chmod +x zcode-cdn-mock
+# 1. 克隆仓库（国内可用 gh-proxy）
+git clone https://gh-proxy.org/https://github.com/coloraven/zcode_remote_offline.git
+# 或直连：git clone https://github.com/coloraven/zcode_remote_offline.git
+cd zcode_remote_offline/offline
 
-docker build -f Dockerfile.prebuilt -t zcode-cdn-mock:local .
+# 2. 构建镜像（Dockerfile 多阶段：国内默认 docker.linkos.org + goproxy.cn，构建时编译）
+#    amd64：
+docker build --platform linux/amd64 -t zcode-cdn-mock:local .
+#    arm64：
+# docker build --platform linux/arm64 -t zcode-cdn-mock:local .
+#    海外环境可覆盖：
+# docker build --build-arg DOCKER_REGISTRY=docker.io --platform linux/amd64 -t zcode-cdn-mock:local .
+
+# 3. 导出镜像包，供离线机使用
+docker save zcode-cdn-mock:local | gzip > zcode-cdn-mock-image-linux-amd64.tar.gz
+# arm64 示例：
+# docker save zcode-cdn-mock:local | gzip > zcode-cdn-mock-image-linux-arm64.tar.gz
+```
+
+等价写法（compose / 脚本，同样是源码编译进镜像）：
+
+```bash
+cd zcode_remote_offline/offline
+./docker-up.sh --amd64    # 或 --arm64
 docker save zcode-cdn-mock:local | gzip > zcode-cdn-mock-image-linux-amd64.tar.gz
 ```
 
@@ -95,8 +114,8 @@ docker save zcode-cdn-mock:local | gzip > zcode-cdn-mock-image-linux-amd64.tar.g
 
 | 文件 | 说明 |
 |------|------|
-| `zcode-cdn-mock-image-linux-amd64.tar.gz` | 已构建好的镜像包 |
-| `offline/` 资源目录（至少含 `zcode/`） | CDN 静态资源，挂载进容器 |
+| `zcode-cdn-mock-image-linux-amd64.tar.gz`（或 arm64） | 已构建好的镜像包 |
+| 已拉取的 `offline/` 资源（至少含 `zcode/`） | CDN 静态资源，挂载进容器 |
 
 ##### B2. 离线机加载镜像并启动
 
@@ -123,7 +142,7 @@ docker rm zcode-cdn-mock
 
 默认：`http://127.0.0.1:8765`，CDN 根：`http://127.0.0.1:8765/zcode/electron/releases`。
 
-> 说明：Release 里的 `zcode-cdn-mock-docker-linux-*.tar.gz` 是「预编译二进制 + Dockerfile」打包，本机执行 `./docker-up.sh` 仍会**现场 `docker build`**（`FROM scratch`，一般无需拉外网基础镜像）。完全离线、且希望跳过构建时，请按上面 **B1 → B2** 提前导出镜像包。
+> Docker 文件不随 Release 分发；请克隆本仓库后按 **B1 → B2** 自行构建并导出镜像。
 
 ---
 
@@ -176,9 +195,6 @@ cd offline; go run .
 |------|------|
 | `download-offline-assets_<os>_<arch>[.exe]` | 有网拉取工具 |
 | `zcode-cdn-mock_<os>_<arch>[.exe]` | 离线 CDN 服务 |
-| `zcode-cdn-mock-docker-linux-amd64.tar.gz` | Linux amd64 Docker 包 |
-| `zcode-cdn-mock-docker-linux-arm64.tar.gz` | Linux arm64 Docker 包 |
 | `SHA256SUMS.txt` | 校验 |
 
-平台：linux / windows × amd64 / arm64。
----
+平台：linux / windows × amd64 / arm64。Docker 相关请克隆仓库后在 `offline/` 自行构建（见上文方式 B）。

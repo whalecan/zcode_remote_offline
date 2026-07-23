@@ -9,13 +9,8 @@ zcode
 sha256sums-*.txt
 serve.ps1
 docker-up.sh
-docker-up-prebuilt.sh
 docker-compose.amd64.yml
 docker-compose.arm64.yml
-docker-compose.prebuilt.yml
-docker-compose.bundle.yml
-Dockerfile.prebuilt
-docker-bundle-README.txt
 zcode-cdn-mock
 zcode-cdn-mock.exe
 zcode-cdn-mock_*

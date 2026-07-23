@@ -66,29 +66,13 @@ jobs:
           echo "Built:"
           ls -lh dist/
 
-      - name: Pack Linux Docker bundle
-        if: matrix.goos == 'linux'
-        env:
-          GOARCH: ${{ matrix.goarch }}
-        run: |
-          set -euo pipefail
-          BUNDLE="dist/zcode-cdn-mock-docker-linux-${GOARCH}"
-          mkdir -p "${BUNDLE}"
-          cp "dist/zcode-cdn-mock_linux_${GOARCH}" "${BUNDLE}/zcode-cdn-mock"
-          cp offline/Dockerfile.prebuilt "${BUNDLE}/Dockerfile.prebuilt"
-          cp offline/docker-up-prebuilt.sh "${BUNDLE}/docker-up.sh"
-          cp offline/docker-bundle-README.txt "${BUNDLE}/README.txt"
-          sed "s/__GOARCH__/${GOARCH}/g" offline/docker-compose.bundle.yml > "${BUNDLE}/docker-compose.yml"
-          chmod +x "${BUNDLE}/zcode-cdn-mock" "${BUNDLE}/docker-up.sh"
-          tar -C dist -czf "dist/zcode-cdn-mock-docker-linux-${GOARCH}.tar.gz" "zcode-cdn-mock-docker-linux-${GOARCH}"
-          rm -rf "${BUNDLE}"
-
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: binaries-${{ matrix.goos }}-${{ matrix.goarch }}
           path: |
-            dist/*
+            dist/zcode-cdn-mock_*
+            dist/download-offline-assets_*
           if-no-files-found: error
 
   release:
@@ -110,8 +94,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release
-          # artifacts may be nested by artifact name or flat when merge-multiple
-          find artifacts -type f \( -name 'zcode-cdn-mock_*' -o -name 'download-offline-assets_*' -o -name 'zcode-cdn-mock-docker-linux-*.tar.gz' \) -exec cp -t release {} +
+          find artifacts -type f \( -name 'zcode-cdn-mock_*' -o -name 'download-offline-assets_*' \) -exec cp -t release {} +
           cd release
           sha256sum * > SHA256SUMS.txt
           ls -lah
@@ -138,6 +121,10 @@ jobs:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: ${{ steps.tag.outputs.tag }}
           generate_release_notes: true
+          body: |
+            ## 产物说明
+            本 Release **仅包含二进制**（`zcode-cdn-mock_*` / `download-offline-assets_*`）。
+            Docker 相关文件请自行克隆仓库后在 `offline/` 目录构建，详见 README。
           files: |
             release/*
           fail_on_unmatched_files: true

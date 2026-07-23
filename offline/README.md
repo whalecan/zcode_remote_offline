@@ -34,9 +34,8 @@
 offline/
 ├── README.md
 ├── main.go / go.mod                   ← CDN 服务本体（独立 Go 程序）
+├── Dockerfile / docker-compose*.yml / docker-up.sh  ← 可选：Docker（构建时编译）
 ├── serve.ps1                          ← 可选：无 Go 时的 Windows 本机服务
-├── Dockerfile / Dockerfile.prebuilt   ← 可选：Docker（amd64 / arm64）
-├── docker-compose*.yml / docker-up*.sh
 ├── sha256sums-linux-x64.txt
 └── zcode/electron/releases/
     ├── 3.4.2/
@@ -116,14 +115,18 @@ docker compose -f docker-compose.yml -f docker-compose.arm64.yml up -d --build
 
 | 文件 | 说明 |
 |------|------|
-| `Dockerfile` | 多架构源码构建（BuildKit `TARGETARCH`） |
-| `Dockerfile.prebuilt` | 使用预编译二进制（无需 Go） |
+| `Dockerfile` | 多架构源码构建（构建时编译，BuildKit `TARGETARCH`） |
 | `docker-compose.yml` | 源码构建启动 |
 | `docker-compose.amd64.yml` / `docker-compose.arm64.yml` | 显式架构 |
-| `docker-compose.prebuilt.yml` | 预编译二进制启动 |
-| `docker-up.sh` / `docker-up-prebuilt.sh` | 一键启停 |
+| `docker-up.sh` | 一键启停 |
 
-从 GitHub Release 也可直接下载 `zcode-cdn-mock-docker-linux-amd64.tar.gz` / `…-arm64.tar.gz`（内含二进制 + Dockerfile + compose + 启动脚本）。
+克隆本仓库后，在本目录用 Docker 多阶段构建（构建时编译，无需下载 Release 二进制）：
+
+```bash
+docker build --platform linux/amd64 -t zcode-cdn-mock:local .
+# 或
+./docker-up.sh --amd64
+```
 
 ---
 
