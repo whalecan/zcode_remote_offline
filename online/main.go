@@ -59,6 +59,10 @@ func encodePath(p string) string {
 	parts := strings.Split(p, "/")
 	for i, seg := range parts {
 		parts[i] = url.PathEscape(seg)
+		// Some CDN handlers decode a path segment with query semantics, where a
+		// literal '+' becomes a space. PathEscape intentionally preserves '+',
+		// so encode it explicitly for artifact URLs.
+		parts[i] = strings.ReplaceAll(parts[i], "+", "%2B")
 	}
 	return strings.Join(parts, "/")
 }
