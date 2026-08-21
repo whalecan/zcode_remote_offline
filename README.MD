@@ -1,4 +1,7 @@
 # ZCode 远程开发包下载MOCK服务
+
+`Fork From: https://github.com/coloraven/zcode_remote_offline`
+
 ## 项目用途
 ZCode 连接 SSH 远程（linux-x64）时，需要在线从 CDN 拉取 `manifest` 与组件包（`server-bundle` / `node-runtime` 等），再部署到远程主机。
 
@@ -8,7 +11,7 @@ ZCode 连接 SSH 远程（linux-x64）时，需要在线从 CDN 拉取 `manifest
 1. **有网侧**：从官方 CDN 把指定版本资源镜像到本地 `offline/` 目录  
 2. **离线侧**：用本地 HTTP 服务（或 Docker）MOCK 线上 CDN 路径，让客户端通过环境变量 `ZCODE_REMOTE_ASSET_CDN_BASE_URL` 走内网/本机地址完成下载
 
-支持多版本资源并存，按客户端请求的版本路径自动响应。日常使用下载 [Releases](https://github.com/coloraven/zcode_remote_offline/releases) 的二进制或 Docker 镜像包即可，无需安装 Go。
+支持多版本资源并存，按客户端请求的版本路径自动响应。日常使用下载 [Releases](https://github.com/whalecan/zcode_remote_offline/releases) 的二进制或 Docker 镜像包即可，无需安装 Go。
 
 ## 项目结构
 
@@ -17,7 +20,7 @@ ZCode 连接 SSH 远程（linux-x64）时，需要在线从 CDN 拉取 `manifest
 | [`online/`](online/) | 有网环境：从公网 CDN 拉取 / 更新资源到 `offline/` |
 | [`offline/`](offline/) | 离线环境：本地 HTTP 服务 MOCK 线上 CDN（多版本自动响应） |
 
-正常使用请从 [GitHub Releases](https://github.com/coloraven/zcode_remote_offline/releases) 下载对应平台二进制，或 Linux 的 `zcode-cdn-mock_docker_image_*.tar.gz` 镜像包（约 2MB）。
+正常使用请从 [GitHub Releases](https://github.com/whalecan/zcode_remote_offline/releases) 下载对应平台二进制，或 Linux 的 `zcode-cdn-mock_docker_image_*.tar.gz` 镜像包（约 2MB）。
 
 ---
 ## 使用方法
@@ -79,7 +82,7 @@ Release 已提供打好的镜像包（约 2MB）：`zcode-cdn-mock_docker_image_
 
 ##### B1. 下载 Release 镜像包
 
-从 [Releases](https://github.com/coloraven/zcode_remote_offline/releases) 下载对应架构的：
+从 [Releases](https://github.com/whalecan/zcode_remote_offline/releases) 下载对应架构的：
 
 - `zcode-cdn-mock_docker_image_linux_amd64.tar.gz`，或
 - `zcode-cdn-mock_docker_image_linux_arm64.tar.gz`
@@ -117,7 +120,7 @@ docker rm zcode-cdn-mock
 开发或定制时可克隆仓库后本地构建（与 CI 相同，官方 `golang` 基础镜像）：
 
 ```bash
-git clone https://github.com/coloraven/zcode_remote_offline.git
+git clone https://github.com/whalecan/zcode_remote_offline.git
 cd zcode_remote_offline/offline
 docker build --platform linux/amd64 -t zcode-cdn-mock:local .
 docker save zcode-cdn-mock:local | gzip > zcode-cdn-mock_docker_image_linux_amd64.tar.gz
