@@ -93,8 +93,7 @@ jobs:
         with:
           name: binaries-${{ matrix.goos }}-${{ matrix.goarch }}
           path: |
-            dist/zcode-cdn-mock_*
-            dist/download-offline-assets_*
+            dist/*
           if-no-files-found: error
 
   release:
@@ -116,11 +115,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release
-          find artifacts -type f \( \
-            -name 'zcode-cdn-mock_*' -o \
-            -name 'download-offline-assets_*' \
-          \) -exec cp -t release {} +
-          find artifacts -type f -name 'zcode-cdn-mock_docker_image_*.tar.gz' -exec cp -t release {} +
+          find artifacts -type f -exec cp -t release {} +
           binary_count=$(find release -maxdepth 1 -type f \( \
             -name 'zcode-cdn-mock_linux_*' -o \
             -name 'zcode-cdn-mock_windows_*' -o \
@@ -161,6 +156,7 @@ jobs:
               离线机：`docker load -i …` 后 `docker run`，详见 README。
           files: |
             release/*
+          overwrite_files: true
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
