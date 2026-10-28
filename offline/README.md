@@ -13,8 +13,8 @@
 
 安装版连接 SSH 远程时会：
 
-1. 请求 CDN 上的 `manifest-linux-x64.json`
-2. 按 manifest 下载组件包（`server-bundle` / `node-runtime` / `node-pty` / `glm` / `ripgrep`）
+1. 请求 CDN 上的资源清单：旧版为 `manifest-linux-x64.json`，新版为 `source-server-release.json`
+2. 旧版按 `components` 下载组件包；新版按 `archives` 中的 `target=linux-x64` 下载完整服务端包 `zcode-server-linux-x64.tar.gz`
 3. 解压到本机 `%APPDATA%\ZCode\remote-assets-cache`
 4. 经 SFTP 上传到远程 `~/.zcode/server` 并启动
 
@@ -42,6 +42,9 @@ offline/
     │   └── manifest-linux-x64.json
     ├── 3.5.0/                         ← 可并存多个版本
     │   └── manifest-linux-x64.json
+    ├── 3.16.3/
+    │   ├── source-server-release.json
+    │   └── zcode-server-linux-x64.tar.gz
     └── components/linux-x64/
         └── <id>/<version>.tar.gz
 ```
@@ -51,6 +54,8 @@ offline/
 | 资源 | URL 形态 |
 |------|----------|
 | 清单文件 | `{CDN}/<version>/manifest-linux-x64.json` |
+| 新版清单文件 | `{CDN}/<version>/source-server-release.json` |
+| 新版服务端包 | `{CDN}/<version>/zcode-server-linux-x64.tar.gz` |
 | 组件包 | `{CDN}/components/linux-x64/<id>/<version>.tar.gz` |
 
 其中 `{CDN}` 默认可理解为：`https://cdn-zcode.z.ai/zcode/electron/releases`
@@ -84,11 +89,14 @@ PORT=9000 BIND=0.0.0.0 ./zcode-cdn-mock_linux_amd64
 | `http://127.0.0.1:8765/versions.json` | 机器可读版本列表（每次请求扫描目录） |
 | `http://127.0.0.1:8765/healthz` | 健康检查 |
 | `http://127.0.0.1:8765/zcode/electron/releases/3.4.2/manifest-linux-x64.json` | 某版本清单 |
+| `http://127.0.0.1:8765/zcode/electron/releases/3.16.3/source-server-release.json` | 新版清单 |
+| `http://127.0.0.1:8765/zcode/electron/releases/3.16.3/zcode-server-linux-x64.tar.gz` | 新版 Linux x64 服务端包 |
 
 ### 多版本自动响应
 
 - 用 [`../online`](../online) 再拉一个版本（例如 `3.5.0`）进本目录后，**无需改代码**；进程保持运行即可按路径响应。
-- 客户端请求 `…/3.4.2/manifest-…` 或 `…/3.5.0/manifest-…` 时，有对应文件即返回。
+- Go 服务和 `serve.ps1` 均识别 `manifest-*.json` 与 `source-server-release.json`，并在版本列表中展示；目录中只有新版资源时也可启动。
+- 客户端请求清单和压缩包时，有对应文件即按原路径返回；服务端无需解析或转换 JSON 内容。
 - `ZCODE_REMOTE_ASSET_CDN_BASE_URL` 始终指向**不带版本号**的 releases 根即可。
 
 ---
@@ -253,7 +261,7 @@ Get-FileHash -Algorithm SHA256 .\zcode\electron\releases\components\linux-x64\*\
 
 ### 客户端版本与目录里版本不一致
 
-manifest 的 `appVersion` 必须与客户端一致。用 [`../online`](../online) 拉取对应版本后放入本目录即可；多版本可并存，服务会按请求路径自动响应。
+旧版清单的 `appVersion`、新版清单及目标归档的 `version` 必须与客户端一致。用 [`../online`](../online) 拉取对应版本后放入本目录即可；多版本可并存，服务会按请求路径自动响应。
 
 ### 端口被占用
 

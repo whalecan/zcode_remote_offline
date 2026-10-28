@@ -110,7 +110,7 @@ func listVersions(root string) []versionInfo {
 		var manifests []string
 		for _, f := range files {
 			name := f.Name()
-			if !f.IsDir() && strings.HasPrefix(name, "manifest-") && strings.HasSuffix(name, ".json") {
+			if !f.IsDir() && (name == "source-server-release.json" || strings.HasPrefix(name, "manifest-") && strings.HasSuffix(name, ".json")) {
 				manifests = append(manifests, name)
 			}
 		}

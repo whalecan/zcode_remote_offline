@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -19,9 +20,51 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 const platformArch = "linux-x64"
+
+// 按版本优先尝试对应清单，同时兼容 CDN 的分批迁移。
+func manifestNames(version string) []string {
+	legacy := "manifest-" + platformArch + ".json"
+	modern := "source-server-release.json"
+	p := parseVersionParts(version)
+	if len(p) >= 3 && (p[0] > 3 || p[0] == 3 && (p[1] > 16 || p[1] == 16 && p[2] >= 1)) {
+		return []string{modern, legacy}
+	}
+	return []string{legacy, modern}
+}
+
+func hasLocalManifest(releasesRoot, version string) bool {
+	for _, name := range manifestNames(version) {
+		if st, err := os.Stat(filepath.Join(releasesRoot, version, name)); err == nil && !st.IsDir() {
+			return true
+		}
+	}
+	return false
+}
+
+func hasRemoteManifest(client *http.Client, base, version string) bool {
+	for _, name := range manifestNames(version) {
+		if headOK(client, trimSlash(base)+"/"+version+"/"+name) {
+			return true
+		}
+	}
+	return false
+}
+
+func fetchManifest(client *http.Client, base, version string) (*http.Response, string, error) {
+	var failures []string
+	for _, name := range manifestNames(version) {
+		resp, err := fetchOK(client, trimSlash(base)+"/"+version+"/"+name)
+		if err == nil {
+			return resp, name, nil
+		}
+		failures = append(failures, name+": "+err.Error())
+	}
+	return nil, "", fmt.Errorf("版本 %s 清单下载失败：%s", version, strings.Join(failures, "; "))
+}
 
 var (
 	defaultCDNCandidates = []string{
@@ -38,10 +81,11 @@ var (
 )
 
 type component struct {
-	ID           string `json:"id"`
-	Version      string `json:"version"`
-	Sha256       string `json:"sha256"`
-	ArtifactPath string `json:"artifactPath"`
+	ID           string   `json:"id"`
+	Version      string   `json:"version"`
+	Sha256       string   `json:"sha256"`
+	ArtifactPath string   `json:"artifactPath"`
+	URLs         []string `json:"-"`
 }
 
 type manifest struct {
@@ -51,18 +95,125 @@ type manifest struct {
 	Components    []component `json:"components"`
 }
 
+type serverRelease struct {
+	SchemaVersion int    `json:"schemaVersion"`
+	Version       string `json:"version"`
+	Archives      []struct {
+		Target   string   `json:"target"`
+		Version  string   `json:"version"`
+		FileName string   `json:"fileName"`
+		Sha256   string   `json:"sha256"`
+		URLs     []string `json:"urls"`
+	} `json:"archives"`
+}
+
+// 将两种线上清单转换成统一下载计划；磁盘上仍保留原始清单。
+func parseManifest(data []byte, version, cdnBase string) (manifest, error) {
+	var m manifest
+	if err := json.Unmarshal(data, &m); err != nil {
+		return m, err
+	}
+	var release serverRelease
+	if err := json.Unmarshal(data, &release); err != nil {
+		return m, err
+	}
+	if release.Archives != nil {
+		if release.Version != version {
+			return m, fmt.Errorf("version 不匹配：实际=%s 期望=%s", release.Version, version)
+		}
+		base, err := url.Parse(trimSlash(cdnBase) + "/" + version + "/")
+		if err != nil {
+			return m, err
+		}
+		m = manifest{SchemaVersion: release.SchemaVersion, AppVersion: release.Version, PlatformArch: platformArch}
+		for _, archive := range release.Archives {
+			if archive.Target != platformArch {
+				continue
+			}
+			if archive.Version != version {
+				return m, fmt.Errorf("archive.version 不匹配：实际=%s 期望=%s", archive.Version, version)
+			}
+			if archive.FileName == "" || strings.ContainsAny(archive.FileName, "/\\:") || archive.FileName == "." || archive.FileName == ".." {
+				return m, fmt.Errorf("无效的 archive.fileName：%q", archive.FileName)
+			}
+			if hash, err := hex.DecodeString(archive.Sha256); err != nil || len(hash) != sha256.Size {
+				return m, fmt.Errorf("无效的 archive.sha256：%q", archive.Sha256)
+			}
+			c := component{ID: "source-server", Version: archive.Version, Sha256: strings.ToLower(archive.Sha256), ArtifactPath: version + "/" + archive.FileName}
+			refs := archive.URLs
+			if len(refs) == 0 {
+				refs = []string{archive.FileName}
+			}
+			for i, raw := range refs {
+				ref, err := url.Parse(raw)
+				if err != nil || raw == "" {
+					return m, fmt.Errorf("无效的 archive URL：%q", raw)
+				}
+				resolved := base.ResolveReference(ref)
+				if resolved.Scheme != "http" && resolved.Scheme != "https" || resolved.Host == "" {
+					return m, fmt.Errorf("不支持的 archive URL：%q", raw)
+				}
+				if i == 0 && !ref.IsAbs() && ref.Host == "" {
+					// 按清单首选相对 URL 镜像，离线客户端可原样访问。
+					rootPath := strings.TrimSuffix(base.Path, version+"/")
+					resolvedPath := path.Clean(resolved.Path)
+					if !strings.HasPrefix(resolvedPath, rootPath) || strings.ContainsAny(resolvedPath, "\\:") {
+						return m, fmt.Errorf("archive URL 超出 releases 目录：%q", raw)
+					}
+					c.ArtifactPath = strings.TrimPrefix(resolvedPath, rootPath)
+				}
+				c.URLs = append(c.URLs, resolved.String())
+			}
+			m.Components = append(m.Components, c)
+		}
+	}
+	if m.PlatformArch != platformArch {
+		return m, fmt.Errorf("platformArch 不匹配：实际=%s 期望=%s", m.PlatformArch, platformArch)
+	}
+	if m.AppVersion != version {
+		return m, fmt.Errorf("appVersion 不匹配：实际=%s 期望=%s", m.AppVersion, version)
+	}
+	if len(m.Components) == 0 {
+		return m, fmt.Errorf("清单中没有 %s 的资源", platformArch)
+	}
+	return m, nil
+}
+
 func trimSlash(s string) string {
 	return strings.TrimRight(s, "/")
 }
 
+func pathSegmentUnreserved(c byte) bool {
+	return ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z') || ('0' <= c && c <= '9') ||
+		c == '-' || c == '.' || c == '_' || c == '~'
+}
+
+// encodePath 对 manifest artifactPath 做 RFC 3986 path-segment 编码。
+// 仅保留 unreserved（A-Z a-z 0-9 - . _ ~），其余字节一律 %XX。
+// Go 的 url.PathEscape 会保留 + 等 sub-delims，OSS/CDN 对象名需严格编码。
 func encodePath(p string) string {
 	parts := strings.Split(p, "/")
 	for i, seg := range parts {
-		parts[i] = url.PathEscape(seg)
-		// Some CDN handlers decode a path segment with query semantics, where a
-		// literal '+' becomes a space. PathEscape intentionally preserves '+',
-		// so encode it explicitly for artifact URLs.
-		parts[i] = strings.ReplaceAll(parts[i], "+", "%2B")
+		var b strings.Builder
+		for j := 0; j < len(seg); {
+			c := seg[j]
+			if pathSegmentUnreserved(c) {
+				b.WriteByte(c)
+				j++
+				continue
+			}
+			r, size := utf8.DecodeRuneInString(seg[j:])
+			if r == utf8.RuneError && size == 1 {
+				b.WriteString(fmt.Sprintf("%%%02X", c))
+				j++
+				continue
+			}
+			for _, by := range []byte(seg[j : j+size]) {
+				b.WriteString(fmt.Sprintf("%%%02X", by))
+			}
+			j += size
+		}
+		parts[i] = b.String()
 	}
 	return strings.Join(parts, "/")
 }
@@ -121,8 +272,7 @@ func detectDefaultVersion(releasesRoot string) string {
 		return versionLess(versions[j], versions[i])
 	})
 	for _, ver := range versions {
-		mp := filepath.Join(releasesRoot, ver, "manifest-"+platformArch+".json")
-		if _, err := os.Stat(mp); err == nil {
+		if hasLocalManifest(releasesRoot, ver) {
 			return ver
 		}
 	}
@@ -224,8 +374,7 @@ func resolveCDNBase(client *http.Client, preferred string) (string, error) {
 func resolveBase(client *http.Client, version, preferred string) (string, error) {
 	if preferred != "" {
 		preferred = trimSlash(preferred)
-		u := preferred + "/" + version + "/manifest-" + platformArch + ".json"
-		resp, err := fetchOK(client, u)
+		resp, _, err := fetchManifest(client, preferred, version)
 		if err != nil {
 			return "", fmt.Errorf("指定 CDN 不可用：%w", err)
 		}
@@ -235,8 +384,7 @@ func resolveBase(client *http.Client, version, preferred string) (string, error)
 	}
 	var lastErr error
 	for _, base := range defaultCDNCandidates {
-		u := base + "/" + version + "/manifest-" + platformArch + ".json"
-		resp, err := fetchOK(client, u)
+		resp, _, err := fetchManifest(client, base, version)
 		if err != nil {
 			fmt.Println("CDN 不可用：", base, err.Error())
 			lastErr = err
@@ -374,8 +522,7 @@ func listLocalVersions(releasesRoot string) map[string]bool {
 		if !e.IsDir() || !versionDirRE.MatchString(e.Name()) {
 			continue
 		}
-		mp := filepath.Join(releasesRoot, e.Name(), "manifest-"+platformArch+".json")
-		if _, err := os.Stat(mp); err == nil {
+		if hasLocalManifest(releasesRoot, e.Name()) {
 			out[e.Name()] = true
 		}
 	}
@@ -399,8 +546,7 @@ func probeRemoteVersions(client *http.Client, cdnBase string, candidates []strin
 		go func() {
 			defer wg.Done()
 			for ver := range jobs {
-				u := trimSlash(cdnBase) + "/" + ver + "/manifest-" + platformArch + ".json"
-				results <- result{version: ver, ok: headOK(client, u)}
+				results <- result{version: ver, ok: hasRemoteManifest(client, cdnBase, ver)}
 			}
 		}()
 	}
@@ -445,7 +591,7 @@ func runListVersions(cdnPreferred, releasesRoot string) error {
 	sort.Slice(candidates, func(i, j int) bool {
 		return versionLess(candidates[j], candidates[i])
 	})
-	fmt.Printf("候选 %d 个，正在探测 CDN 上是否存在 manifest-%s.json ...\n", len(candidates), platformArch)
+	fmt.Printf("候选 %d 个，正在探测 manifest-%s.json / source-server-release.json ...\n", len(candidates), platformArch)
 
 	found := probeRemoteVersions(client, cdnBase, candidates)
 	local := listLocalVersions(releasesRoot)
@@ -456,7 +602,7 @@ func runListVersions(cdnPreferred, releasesRoot string) error {
 	fmt.Printf("远程可用   : %d 个版本\n", len(found))
 	fmt.Println()
 	if len(found) == 0 {
-		fmt.Println("（未探测到带 linux-x64 manifest 的版本）")
+		fmt.Println("（未探测到带资源清单的版本）")
 		return nil
 	}
 	for _, ver := range found {
@@ -572,28 +718,37 @@ func ensureArtifact(client *http.Client, releasesRoot, cdnBase string, c compone
 		}
 	}
 
-	rawURL := cdnBase + "/" + encodePath(c.ArtifactPath)
+	urls := c.URLs
+	if len(urls) == 0 {
+		urls = []string{cdnBase + "/" + encodePath(c.ArtifactPath)}
+	}
 	forceTag := ""
 	if force {
 		forceTag = "（强制）"
 	}
 	fmt.Printf("[下载] %s%s\n", c.ID, forceTag)
-	fmt.Println(" ", rawURL)
 	fmt.Println("  ->", dest)
-	if err := downloadTo(client, rawURL, dest); err != nil {
-		return err
-	}
-	if expected != "" {
-		actual, err := sha256File(dest)
-		if err != nil {
-			return err
+	var lastErr error
+	for _, rawURL := range urls {
+		fmt.Println(" ", rawURL)
+		if err := downloadTo(client, rawURL, dest); err != nil {
+			lastErr = err
+			continue
 		}
-		if actual != expected {
-			return fmt.Errorf("%s 的 sha256 不匹配：期望=%s 实际=%s", c.ID, expected, actual)
+		if expected != "" {
+			actual, err := sha256File(dest)
+			if err != nil {
+				return err
+			}
+			if actual != expected {
+				lastErr = fmt.Errorf("%s 的 sha256 不匹配：期望=%s 实际=%s", c.ID, expected, actual)
+				continue
+			}
+			fmt.Println("  sha256 校验通过")
 		}
-		fmt.Println("  sha256 校验通过")
+		return nil
 	}
-	return nil
+	return lastErr
 }
 
 func writeSha256Sums(offlineRoot string, m manifest) error {
@@ -603,7 +758,7 @@ func writeSha256Sums(offlineRoot string, m manifest) error {
 	b.WriteString(" / ")
 	b.WriteString(platformArch)
 	b.WriteString(" 组件压缩包 SHA256\n")
-	b.WriteString("# 与 manifest.components[].sha256 一致\n\n")
+	b.WriteString("# 与清单中对应平台资源的 sha256 一致\n\n")
 	for _, c := range m.Components {
 		b.WriteString(c.Sha256)
 		b.WriteString("  ")
@@ -653,7 +808,7 @@ func printHelp() {
   go run . [选项]          # 仅开发
 
 选项：
-  -list, -l                列出 CDN 上可用的版本（探测 manifest-linux-x64.json）
+  -list, -l                列出 CDN 上可用的版本（兼容新旧清单名称）
   -version, -v <版本号>   要拉取的应用版本（默认：offline 中已有的最高版本）
   -cdn <地址>             强制指定 CDN releases 根地址（跳过自动探测）
   -force, -f              即使本地 sha256 已匹配也强制重新下载
@@ -752,35 +907,26 @@ func main() {
 		fatal(err)
 	}
 
-	manifestPath := filepath.Join(releasesRoot, version, "manifest-"+platformArch+".json")
-	manifestURL := cdnBase + "/" + version + "/manifest-" + platformArch + ".json"
-	fmt.Println("[下载] 清单", manifestURL)
-
-	resp, err := fetchOK(client, manifestURL)
+	resp, manifestName, err := fetchManifest(client, cdnBase, version)
 	if err != nil {
 		fatal(err)
 	}
+	manifestPath := filepath.Join(releasesRoot, version, manifestName)
+	fmt.Println("[下载] 清单", cdnBase+"/"+version+"/"+manifestName)
 	mText, err := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
 	if err != nil {
 		fatal(err)
+	}
+	fresh, err := parseManifest(mText, version, cdnBase)
+	if err != nil {
+		fatal(fmt.Errorf("%s: %w", manifestName, err))
 	}
 	if err := os.MkdirAll(filepath.Dir(manifestPath), 0o755); err != nil {
 		fatal(err)
 	}
 	if err := os.WriteFile(manifestPath, mText, 0o644); err != nil {
 		fatal(err)
-	}
-
-	var fresh manifest
-	if err := json.Unmarshal(mText, &fresh); err != nil {
-		fatal(err)
-	}
-	if fresh.PlatformArch != platformArch {
-		fatal(fmt.Errorf("platformArch 不匹配：实际=%s 期望=%s", fresh.PlatformArch, platformArch))
-	}
-	if fresh.AppVersion != version {
-		fatal(fmt.Errorf("appVersion 不匹配：实际=%s 期望=%s", fresh.AppVersion, version))
 	}
 
 	for _, c := range fresh.Components {

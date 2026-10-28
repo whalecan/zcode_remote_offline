@@ -16,7 +16,9 @@ function Get-OfflineVersions {
   Get-ChildItem -LiteralPath $Releases -Directory -ErrorAction SilentlyContinue |
     Where-Object { $_.Name -match '^\d+\.\d+\.\d+' } |
     ForEach-Object {
-      $manifests = Get-ChildItem -LiteralPath $_.FullName -Filter 'manifest-*.json' -File -ErrorAction SilentlyContinue
+      $manifests = @(Get-ChildItem -LiteralPath $_.FullName -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like 'manifest-*.json' -or $_.Name -eq 'source-server-release.json' } |
+        Sort-Object Name)
       if ($manifests) {
         [pscustomobject]@{
           Version   = $_.Name
@@ -29,7 +31,7 @@ function Get-OfflineVersions {
 
 $versions = @(Get-OfflineVersions)
 if ($versions.Count -eq 0) {
-  throw "在 $Releases 下未找到任何带 manifest 的版本目录（如 3.4.2）。"
+  throw "在 $Releases 下未找到带 manifest-*.json 或 source-server-release.json 的版本目录。"
 }
 
 $prefix = '/zcode/electron/releases'

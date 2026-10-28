@@ -58,7 +58,7 @@ chmod +x download-offline-assets_linux_amd64
 
 不传 `-version` 时，会尝试使用 `offline` 里已有的最高版本。
 
-> `-list` 会读取 update feed / changelog 收集候选，再探测各版本是否存在 `manifest-linux-x64.json`（CDN 本身无目录索引）。
+> `-list` 会读取 update feed / changelog 收集候选，再探测各版本是否存在 `manifest-linux-x64.json` 或 `source-server-release.json`（CDN 本身无目录索引）。
 
 ---
 
@@ -76,19 +76,23 @@ go build -trimpath -ldflags="-s -w" -o download-offline-assets.exe .
 
 ## 工具会做什么
 
-1. 从 CDN 下载 `manifest-linux-x64.json` → `offline/zcode/electron/releases/<version>/`
-2. 按 manifest 下载全部组件 `.tar.gz` → `offline/zcode/electron/releases/components/linux-x64/...`
-3. 用组件 `sha256` 校验本地文件
+1. 从 CDN 下载资源清单 → `offline/zcode/electron/releases/<version>/`，保留线上文件名。3.16.1 及以上版本优先尝试 `source-server-release.json`，旧版本优先尝试 `manifest-linux-x64.json`；找不到时自动尝试另一名称。
+2. 旧版按 `components` 下载组件包到 `components/linux-x64/...`；新版从 `archives` 选择 `target=linux-x64`，按 `urls` 下载完整服务端包到对应版本目录（如 `3.16.3/zcode-server-linux-x64.tar.gz`）
+3. 用清单中的 `sha256` 校验本地文件；新版多个下载地址依次回退
 4. 更新 `offline/sha256sums-linux-x64.txt`
 
 对应线上路径：
 
 | 资源 | URL 形态 |
 |------|----------|
-| 清单文件 | `{CDN}/<version>/manifest-linux-x64.json` |
+| 旧版清单文件 | `{CDN}/<version>/manifest-linux-x64.json` |
+| 新版清单文件 | `{CDN}/<version>/source-server-release.json` |
 | 组件包 | `{CDN}/components/linux-x64/<id>/<version>.tar.gz` |
+| 新版服务端包 | `{CDN}/<version>/zcode-server-linux-x64.tar.gz` |
 
 ---
+
+兼容两种清单结构：旧版的 `appVersion`、`platformArch`、`components`，以及新版的 `version`、`archives`（包含 `target`、`version`、`fileName`、`sha256`、`urls`）。原始 JSON 按线上名称保存；工具仅下载 linux-x64 的资源，不下载清单中的其他平台包。版本不匹配或缺少目标平台资源时会报错。
 
 ## 更新后如何分发到离线机
 
